@@ -31,6 +31,8 @@
 *.out
 *.app
 
+.vscode/
+*.db
 
 # C++ objects and libs
 *.slo
