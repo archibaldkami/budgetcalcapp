@@ -53,6 +53,8 @@ class Database {
         std::vector<Category> get_categories(int id);
         std::vector<Operation> get_operations_by_vault(int id);
         std::vector<Operation> get_operations_by_category(int id);
+        std::vector<Operation> get_recent_operations_by_vault(int id);
+        std::vector<Operation> get_recent_operations_by_category(int id);
         Operation get_operation(int id);
         Category get_category(int id);
         double get_balance(int id);

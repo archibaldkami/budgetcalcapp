@@ -44,9 +44,9 @@ int Database::callback_operation(void* data, int argc, char** argv, char** colNa
 
     Operation operation;
     operation.id = stoi(argv[0]);
-    operation.date = stoi(argv[1]);;
-    operation.amount = stof(argv[2]);;
-    operation.category = stoi(argv[3]);;
+    operation.date = stoi(argv[1]);
+    operation.amount = stof(argv[2]);
+    operation.category = stoi(argv[3]);
     operation.description = argv[5] ? argv[4] : "";
 
     operations->push_back(operation);
@@ -173,8 +173,6 @@ int Database::init_base_table() {
 }
 
 int Database::create_balance(int id) {
-    char* errMsg = nullptr;
-    
     sqlite3_stmt* stmt;
     const char* sql = "INSERT INTO op_vault_amount (id, amount) VALUES (?, ?);";
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
@@ -201,8 +199,6 @@ int Database::create_balance(int id) {
 }
 
 int Database::create_vault(const char* name, const char* description) {
-    char* errMsg = nullptr;
-    
     sqlite3_stmt* stmt;
     const char* sql = "INSERT INTO doc_vaults (name, description) VALUES (?, ?);";
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
@@ -230,8 +226,6 @@ int Database::create_vault(const char* name, const char* description) {
 }
 
 int Database::create_category(const char* name, const char* color, int vault, int type, const char* description) {
-    char* errMsg = nullptr;
-    
     sqlite3_stmt* stmt;
     const char* sql = "INSERT INTO doc_categories (name, color, vault, type, description) VALUES (?, ?, ?, ?, ?);";
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
@@ -260,11 +254,34 @@ int Database::create_category(const char* name, const char* color, int vault, in
     return 0;
 }
 
+Database::Category Database::get_category(int id) {
+    sqlite3_stmt* stmt;
+
+    const char* sql = "SELECT * FROM doc_categories WHERE id = ?;";
+    Category category;
+
+    sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, id);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        category.vault = sqlite3_column_int(stmt, 3);
+        category.type = sqlite3_column_int(stmt, 4);
+    }
+    sqlite3_finalize(stmt);
+
+    cout << green << "LOG " << reset << "get_category success" << endl;
+
+    return category;
+}
+
 int Database::insert_operation(int date, double amount, int category, const char* description) {
-    char* errMsg = nullptr;
-    
     sqlite3_stmt* stmt;
     const char* sql = "INSERT INTO op_operation_history (date, amount, category, description) VALUES (?, ?, ?, ?);";
+    Database::Category cat = Database::get_category(category);
+    int mod = cat.type-1 ? -1 : 1;
+    double bal = Database::get_balance(cat.vault);
+    Database::change_balance(cat.vault, bal+amount*mod);
+    
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
     
     if (rc != SQLITE_OK) {
@@ -307,7 +324,6 @@ vector<Database::Vault> Database::get_vaults() {
 }
 
 double Database::get_balance(int id) {
-    char* errMsg = nullptr;
     sqlite3_stmt* stmt;
 
     const char* sql = "SELECT * FROM op_vault_amount WHERE id = ?;";
@@ -320,7 +336,9 @@ double Database::get_balance(int id) {
         amount = sqlite3_column_double(stmt, 1);
     }
     sqlite3_finalize(stmt);
-    
+
+    cout << green << "LOG " << reset << "get_balance success" << endl;
+
     return amount;
 }
 
@@ -334,6 +352,7 @@ vector<Database::Operation> Database::get_operations_by_vault(int id) {
         cerr << red << "ERR " << reset << "SQL error get_operations_by_vault: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "get_operations_by_vault success" << endl;
     return result;
 }
 
@@ -347,6 +366,52 @@ vector<Database::Operation> Database::get_operations_by_category(int id) {
         cerr << red << "ERR " << reset << "SQL error get_operations_by_category: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "get_operations_by_category success" << endl;
+    return result;
+}
+
+vector<Database::Operation> Database::get_recent_operations_by_vault(int id) {
+    vector<Operation> result;
+    char* errMsg = nullptr;
+    char sql[512];
+
+    time_t monthAgo = time(nullptr) - 30 * 24 * 60 * 60;
+
+    sprintf(sql,
+        "SELECT o.* FROM op_operation_history o "
+        "JOIN doc_categories c ON o.category = c.id "
+        "JOIN doc_vaults v ON c.vault = v.id "
+        "WHERE v.id = %d AND o.date >= %ld;",
+        id, static_cast<long>(monthAgo)
+    );
+
+    int rc = sqlite3_exec(db, sql, callback_operation, &result, &errMsg);
+    if (rc != SQLITE_OK) {
+        cerr << red << "ERR " << reset << "SQL error get_recent_operations_by_vault: " << errMsg << endl;
+        sqlite3_free(errMsg);
+    }
+    cout << green << "LOG " << reset << "get_recent_operations_by_vault success" << endl;
+    return result;
+}
+
+vector<Database::Operation> Database::get_recent_operations_by_category(int id) {
+    vector<Operation> result;
+    char* errMsg = nullptr;
+    char sql[256];
+
+    time_t monthAgo = time(nullptr) - 30 * 24 * 60 * 60;
+
+    sprintf(sql,
+        "SELECT * FROM op_operation_history WHERE category = %d AND date >= %ld;",
+        id, static_cast<long>(monthAgo)
+    );
+
+    int rc = sqlite3_exec(db, sql, callback_operation, &result, &errMsg);
+    if (rc != SQLITE_OK) {
+        cerr << red << "ERR " << reset << "SQL error get_recent_operations_by_category: " << errMsg << endl;
+        sqlite3_free(errMsg);
+    }
+    cout << green << "LOG " << reset << "get_recent_operations_by_category success" << endl;
     return result;
 }
 
@@ -360,6 +425,7 @@ vector<Database::Category> Database::get_categories(int id) {
         cerr << red << "ERR " << reset << "SQL error get_categories: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "get_categories success" << endl;
     return result;
 }
 
@@ -372,28 +438,65 @@ void Database::change_balance(int id, double amount) {
         cerr << red << "ERR " << reset << "SQL error change_balance: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "change_balance success" << endl;
+}
+
+Database::Operation Database::get_operation(int id) {
+    sqlite3_stmt* stmt;
+
+    const char* sql = "SELECT * FROM op_operation_history WHERE id = ?;";
+    Operation operation;
+
+    sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
+    sqlite3_bind_int(stmt, 1, id);
+
+    if (sqlite3_step(stmt) == SQLITE_ROW) {
+        operation.date = sqlite3_column_int(stmt, 1);
+        operation.amount = sqlite3_column_double(stmt, 2);
+        operation.category = sqlite3_column_int(stmt, 3);
+    }
+    sqlite3_finalize(stmt);
+    cout << green << "LOG " << reset << "get_operation success" << endl;
+    return operation;
 }
 
 void Database::remove_operation(int id) {
     char* errMsg = nullptr;
     char sql[64];
     sprintf(sql, "DELETE FROM op_operation_history WHERE id = %d;", id);
+    Database::Operation op = Database::get_operation(id);
+    Database::Category cat = Database::get_category(op.category);
+    int mod = cat.type-1 ? -1 : 1;
+    double bal = Database::get_balance(cat.vault);
+    Database::change_balance(cat.vault, bal-op.amount*mod);
     int rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
     if (rc != SQLITE_OK) {
         cerr << red << "ERR " << reset << "SQL error remove_operation: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "remove_operation success" << endl;
 }
 
 void Database::remove_operation_by_category(int id) {
     char* errMsg = nullptr;
     char sql[64];
+    
+    vector<Database::Operation> ops = Database::get_operations_by_category(id);
+    double amount = 0;
+    for (auto& op : ops) amount += op.amount;
+
+
     sprintf(sql, "DELETE FROM op_operation_history WHERE category = %d;", id);
     int rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
     if (rc != SQLITE_OK) {
         cerr << red << "ERR " << reset << "SQL error remove_operation: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    Database::Category cat = Database::get_category(id);
+    double mod = cat.type-1 ? -1.0 : 1.0;
+    double bal = Database::get_balance(cat.vault);
+    Database::change_balance(cat.vault, bal - amount * mod);
+    cout << green << "LOG " << reset << "remove_operation_by_category success" << endl;
 }
 
 void Database::remove_category(int id) {
@@ -407,6 +510,7 @@ void Database::remove_category(int id) {
         cerr << red << "ERR " << reset << "SQL error remove_category: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "remove_category success" << endl;
 }
 
 void Database::remove_operations_by_vault(int id) {
@@ -418,6 +522,7 @@ void Database::remove_operations_by_vault(int id) {
         cerr << red << "ERR " << reset << "SQL error remove_category: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
+    cout << green << "LOG " << reset << "remove_operations_by_vault success" << endl;
 }
 
 void Database::remove_categories_by_vault(int id) {
@@ -434,54 +539,24 @@ void Database::remove_categories_by_vault(int id) {
 void Database::remove_vault(int id) {
     remove_operations_by_vault(id);
     remove_categories_by_vault(id);
+    
 
     char* errMsg = nullptr;
     char sql[64];
-    sprintf(sql, "DELETE FROM doc_vaults WHERE id = %d;", id);
+    sprintf(sql, "DELETE FROM doc_vaults WHERE id = %d;", id); // del vault
     int rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
     if (rc != SQLITE_OK) {
         cerr << red << "ERR " << reset << "SQL error remove_vault: " << errMsg << endl;
         sqlite3_free(errMsg);
     }
-}
-
-Database::Operation Database::get_operation(int id) {
-    char* errMsg = nullptr;
-    sqlite3_stmt* stmt;
-
-    const char* sql = "SELECT * FROM op_operation_history WHERE id = ?;";
-    Operation operation;
-
-    sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
-    sqlite3_bind_int(stmt, 1, id);
-
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        operation.date = sqlite3_column_int(stmt, 1);
-        operation.amount = sqlite3_column_double(stmt, 2);
-        operation.category = sqlite3_column_int(stmt, 3);
+    errMsg = nullptr;
+    sprintf(sql, "DELETE FROM op_vault_amount WHERE id = %d;", id); // del balance
+    rc = sqlite3_exec(db, sql, nullptr, nullptr, &errMsg);
+    if (rc != SQLITE_OK) {
+        cerr << red << "ERR " << reset << "SQL error remove_vault_balance: " << errMsg << endl;
+        sqlite3_free(errMsg);
     }
-    sqlite3_finalize(stmt);
-    
-    return operation;
-}
-
-Database::Category Database::get_category(int id) {
-    char* errMsg = nullptr;
-    sqlite3_stmt* stmt;
-
-    const char* sql = "SELECT * FROM doc_categories WHERE id = ?;";
-    Category category;
-
-    sqlite3_prepare_v2(db, sql, -1, &stmt, nullptr);
-    sqlite3_bind_int(stmt, 1, id);
-
-    if (sqlite3_step(stmt) == SQLITE_ROW) {
-        category.vault = sqlite3_column_int(stmt, 3);
-        category.type = sqlite3_column_int(stmt, 4);
-    }
-    sqlite3_finalize(stmt);
-    
-    return category;
+    cout << green << "LOG " << reset << "remove_vault success" << endl;
 }
 
 void Database::fix_diff(int curr_category_id, double curr_amount, Operation prev_operation) {
@@ -498,7 +573,6 @@ void Database::fix_diff(int curr_category_id, double curr_amount, Operation prev
 int Database::update_operation(int id, int date, double amount, int category, char* description) {
     Operation prev_operation = get_operation(id);
     sqlite3_stmt* stmt;
-    char* errMsg = nullptr;
     const char* sql = "UPDATE op_operation_history SET date = ?, amount = ?, category = ?, description = ? WHERE id = ?";
 
     int rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
@@ -607,10 +681,4 @@ Database::Database() {
     } else {
         open(filename);
     }
-}
-
-int main() {
-    Database mreow;
-    mreow.close();
-    return 0;
 }
