@@ -9,42 +9,19 @@ Item {
 
     ListModel {
         id: operationModel
-        // Тепер дата у форматі dd-mm-yyyy
-        ListElement { name: "Продукти"; amount: "-200.00 грн"; type: "out"; date: "06-06-2025" }
-        ListElement { name: "Зарплата"; amount: "+1500 грн"; type: "in"; date: "01-06-2025" }
-        ListElement { name: "Одяг"; amount: "-100.00 грн"; type: "out"; date: "20-05-2025" }
-    }
-
-    ListModel {
-        id: monthListModel
-        ListElement { text: "06-2025" }
-        ListElement { text: "05-2025" }
-    }
-
-    function addMonthYearToSelectorIfMissing(monthYear) {
-        for (var i = 0; i < monthListModel.count; i++) {
-            if (monthListModel.get(i).text === monthYear) {
-                return false; // вже є
-            }
-        }
-        monthListModel.append({"text": monthYear});
-        return true;
+        ListElement { name: "Продукти"; amount: "-200 грн"; type: "out" }
+        ListElement { name: "Зарплата"; amount: "+1500 грн"; type: "in" }
+        ListElement { name: "Одяг"; amount: "-100 грн"; type: "out" }
     }
 
     function updateCategories() {
         var map = {};
         var colors = ["#4CAF50", "#2196F3", "#FFC107", "#FF5722", "#9C27B0", "#E91E63", "#00BCD4", "#8BC34A"];
         var colorIndex = 0;
-        var selectedMonth = monthSelector.currentText;  // формат MM-YYYY, напр. "06-2025"
 
         for (var i = 0; i < operationModel.count; i++) {
             var op = operationModel.get(i);
-
-            // Розділяємо дату "dd-mm-yyyy"
-            var parts = op.date.split("-");
-            var opMonthYear = parts[1] + "-" + parts[2];  // формуємо "MM-YYYY"
-
-            if (op.type === "out" && opMonthYear === selectedMonth) {
+            if (op.type === "out") {
                 var name = op.name;
                 var amountStr = op.amount.replace(/[^\d\-+]/g, "");
                 var value = parseInt(amountStr);
@@ -53,27 +30,13 @@ Item {
                     map[name] = { name: name, amount: 0, color: colors[colorIndex % colors.length] };
                     colorIndex++;
                 }
+
                 map[name].amount += Math.abs(value);
             }
         }
 
         pieCanvas.categories = Object.values(map);
         pieCanvas.requestPaint();
-
-        // Оновлення балансу
-        var sum = 0;
-        for (var i = 0; i < operationModel.count; i++) {
-            var op = operationModel.get(i);
-            var parts = op.date.split("-");
-            var opMonthYear = parts[1] + "-" + parts[2];  // "MM-YYYY"
-
-            if (opMonthYear === selectedMonth) {
-                var numStr = op.amount.match(/[-+]?\d*\.?\d+/);
-                sum += numStr ? parseFloat(numStr[0]) : 0;
-
-            }
-        }
-        balanceText.text = "Баланс: " + sum + " ₴";
     }
 
     Rectangle {
@@ -88,6 +51,7 @@ Item {
             anchors.margins: 10
             spacing: 10
 
+            // Ліворуч: логотип або назва
             Text {
                 text: "Budgetka"
                 color: "white"
@@ -97,8 +61,12 @@ Item {
                 Layout.alignment: Qt.AlignVCenter
             }
 
-            Item { Layout.fillWidth: true }
+            // Заповнювач простору
+            Item {
+                Layout.fillWidth: true
+            }
 
+            // Бургер меню справа
             Item {
                 id: burgerMenu
                 width: 40
@@ -114,6 +82,7 @@ Item {
                 Column {
                     anchors.centerIn: parent
                     spacing: 5
+
                     Rectangle { width: 30; height: 4; color: "white"; radius: 2 }
                     Rectangle { width: 30; height: 4; color: "white"; radius: 2 }
                     Rectangle { width: 30; height: 4; color: "white"; radius: 2 }
@@ -121,6 +90,7 @@ Item {
             }
         }
     }
+
 
     Rectangle {
         id: bgRec
@@ -131,19 +101,26 @@ Item {
         color: "tan"
     }
 
-    ComboBox {
-        id: monthSelector
+    Item {
+        id: dateDisplay
+        width: parent.width
+        height: 50
         anchors.top: header.bottom
-        anchors.topMargin: 10
-        anchors.horizontalCenter: parent.horizontalCenter
+        anchors.topMargin: 20
 
-        model: monthListModel
-        currentIndex: 0
-
-        onCurrentTextChanged: _item.updateCategories()
-
-        delegate: ItemDelegate {
-            text: model.text
+        Text {
+            id: dateText
+            anchors.centerIn: parent
+            color: "black"
+            font.pixelSize: 20
+            font.bold: true
+            text: {
+                let today = new Date();
+                let day = String(today.getDate()).padStart(2, '0');
+                let month = String(today.getMonth() + 1).padStart(2, '0');
+                let year = today.getFullYear();
+                return `${year}-${month}-${day}`;
+            }
         }
     }
 
@@ -151,7 +128,7 @@ Item {
         id: budgetSection
         width: parent.width
         height: parent.height / 2
-        anchors.top: monthSelector.bottom
+        anchors.top: dateDisplay.bottom
 
         Item {
             width: 250
@@ -168,7 +145,9 @@ Item {
                 onPaint: {
                     var ctx = getContext("2d");
                     ctx.clearRect(0, 0, width, height);
-                    if (categories.length === 0) return;
+
+                    if (categories.length === 0)
+                        return;
 
                     var total = 0;
                     for (var i = 0; i < categories.length; i++)
@@ -227,11 +206,20 @@ Item {
                     color: "#2C3E50"
                     font.pixelSize: 18
                     font.bold: true
-                    text: "Баланс: "
+                    text: {
+                        var sum = 0;
+                        for (var i = 0; i < operationModel.count; i++) {
+                            var amountStr = operationModel.get(i).amount;
+                            var numStr = amountStr.replace(/[^\d\-+]/g, "");
+                            sum += parseInt(numStr);
+                        }
+                        return "Баланс: " + sum + " ₴";
+                    }
                 }
             }
         }
     }
+
 
     Item {
         id: operationSection
@@ -273,7 +261,6 @@ Item {
 
             Button {
                 text: "Переглянути операції"
-                font.pixelSize: 14
                 anchors.horizontalCenter: parent.horizontalCenter
                 anchors.verticalCenter: parent.verticalCenter
                 background: Rectangle { color: "#3498db"; radius: 6 }
@@ -312,49 +299,13 @@ Item {
     AddOutcomeDrawer {
         id: addOutcomeDrawer
         operationModel: operationModel
-        property string selectedMonth: monthSelector.currentText
-        onAccepted: {
-            var lastOp = operationModel.get(operationModel.count - 1);
-            var parts = lastOp.date.split("-");
-            var newMonthYear = parts[1] + "-" + parts[2];
-
-            _item.addMonthYearToSelectorIfMissing(newMonthYear);
-
-            // Знайти індекс цього місяця і встановити його
-            for (var i = 0; i < monthListModel.count; i++) {
-                if (monthListModel.get(i).text === newMonthYear) {
-                    monthSelector.currentIndex = i;
-                    break;
-                }
-            }
-
-            _item.updateCategories();
-        }
+        onAccepted: _item.updateCategories()
     }
-
 
     AddIncomeDrawer {
         id: addIncomeDrawer
         operationModel: operationModel
-        onAccepted: {
-            var lastOp = operationModel.get(operationModel.count - 1);
-            var parts = lastOp.date.split("-");
-            var newMonthYear = parts[1] + "-" + parts[2];
-
-            _item.addMonthYearToSelectorIfMissing(newMonthYear);
-
-            // Знайти індекс цього місяця і встановити його
-            for (var i = 0; i < monthListModel.count; i++) {
-                if (monthListModel.get(i).text === newMonthYear) {
-                    monthSelector.currentIndex = i;
-                    break;
-                }
-            }
-
-            _item.updateCategories();
-        }
     }
-
 
     OperationDrawer {
         id: operationDrawer

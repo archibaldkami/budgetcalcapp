@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 
 Window {
-    width: 360
+    width: 400
     height: 720
     visible: true
     title: "Budget Calculation App"

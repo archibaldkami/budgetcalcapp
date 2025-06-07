@@ -22,6 +22,10 @@ qt_add_qml_module(appbudgetcalcapp
         QML_FILES AddOutcomeDrawer.qml
         QML_FILES AddIncomeDrawer.qml
         QML_FILES
+        RESOURCES PieChart.qml
+        QML_FILES OperationDrawer.qml
+        QML_FILES RightDrawer.qml
+        QML_FILES MainPage2.qml
 )
 
 # Qt for iOS sets MACOSX_BUNDLE_GUI_IDENTIFIER automatically since Qt 6.1.
