@@ -19,7 +19,7 @@ int Database::callback_vault(void* data, int argc, char** argv, char** colName) 
     vault.description = argv[2] ? argv[2] : "";
 
     vaults->push_back(vault);
-
+    
     return 0;
 }
 
@@ -539,7 +539,6 @@ void Database::remove_categories_by_vault(int id) {
 void Database::remove_vault(int id) {
     remove_operations_by_vault(id);
     remove_categories_by_vault(id);
-    
 
     char* errMsg = nullptr;
     char sql[64];
