@@ -53,17 +53,17 @@ Drawer {
                     radius: 8
                     anchors.horizontalCenter: parent.horizontalCenter
 
-                    Row {
+                    RowLayout {
                         anchors.fill: parent
                         anchors.margins: 10
                         spacing: 10
 
                         Text {
                             text: model.name
-                            width: 120
                             color: "#333"
                             font.pixelSize: 16
                             verticalAlignment: Text.AlignVCenter
+                            Layout.preferredWidth: 120
                         }
 
                         Text {
@@ -73,7 +73,9 @@ Drawer {
                             verticalAlignment: Text.AlignVCenter
                         }
 
-                        Item { Layout.fillWidth: true }  // Заповнювач, щоб відсунути дату праворуч
+                        Item {
+                            Layout.fillWidth: true
+                        }
 
                         Text {
                             text: model.date
@@ -81,7 +83,7 @@ Drawer {
                             font.pixelSize: 14
                             verticalAlignment: Text.AlignVCenter
                             horizontalAlignment: Text.AlignRight
-                            width: 100
+                            Layout.preferredWidth: 100
                         }
                     }
                 }

@@ -10,11 +10,9 @@ Window {
     StackView {
         id: contentFrame
         anchors.fill: parent
-        width: parent.width
-        height: parent.height
-        initialItem: Qt.resolvedUrl("LoadPage.qml")
-        Component.onCompleted: {
-            contentFrame.replace("MainPage.qml")
+
+        initialItem: MainPage {
+            stackView: contentFrame
         }
     }
 }

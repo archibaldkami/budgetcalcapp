@@ -7,6 +7,8 @@ Item {
     width: parent.width
     height: parent.height
 
+    property StackView stackView: null
+
     ListModel {
         id: operationModel
         // Тепер дата у форматі dd-mm-yyyy
@@ -96,6 +98,15 @@ Item {
                 verticalAlignment: Text.AlignVCenter
                 Layout.alignment: Qt.AlignVCenter
             }
+
+            Text {
+                    text: "Готівка"
+                    font.pixelSize: 20
+                    color: "#fff"
+                    font.bold: true
+                    horizontalAlignment: Text.AlignHCenter
+                    anchors.horizontalCenter: parent.horizontalCenter
+                }
 
             Item { Layout.fillWidth: true }
 
@@ -362,6 +373,21 @@ Item {
     }
 
     RightDrawer {
-        id: rightDrawer
-    }
+            id: rightDrawer
+
+            onGoToMainPage2: {
+                if (stackView) {
+                    stackView.replace(Qt.resolvedUrl("MainPage2.qml"), { stackView: stackView })
+
+                }
+            }
+
+            onGoToMainPage: {
+                if (stackView) {
+                    stackView.replace(Qt.resolvedUrl("MainPage.qml"), { stackView: stackView })
+
+                }
+            }
+        }
+
 }
